@@ -1,0 +1,418 @@
+---
+title: "Project_final"
+author: "Manusha Gadde"
+date: '2022-04-20'
+output: pdf_document
+---
+
+
+
+```{r}
+devtools::install_github("ropensci/skimr")
+install.packages("rio")
+library(tidyverse)
+library(ggplot2)
+options(repr.plot.width = 16, repr.plot.height = 9)
+library(rio)
+library(dplyr)
+library(skimr)
+library(lubridate)
+install.packages("gridExtra")
+library(gridExtra) 
+Sys.setlocale("LC_TIME", "English")
+
+
+
+```
+
+
+```{r}
+
+####
+# step 2. Import data from working directory
+
+daily_sleep<-read.csv("C:/Users/manus/Downloads/sleepDay_merged (1).csv")
+
+daily_activity<-read.csv("C:/Users/manus/Downloads/dailyActivity_merged (1).csv")
+
+hour_calory<- read.csv("C:/Users/manus/Downloads/hourlyCalories_merged (1).csv")
+
+hour_step<-read.csv("C:/Users/manus/Downloads/hourlySteps_merged (1).csv")
+
+
+```
+
+
+
+```{r}
+head(daily_activity)
+head(hour_step)
+head(hour_calory)
+head(daily_sleep)
+```
+
+
+
+
+```{r}
+#create histogram for both datasets
+hist(activity_cleaned$TotalSteps, col='steelblue', main='Normal')
+hist(activity_cleaned$VeryActiveMinutes, col='steelblue', main='Normal')
+hist(activity_cleaned$FairlyActiveMinutes, col='steelblue', main='Normal')
+hist(activity_cleaned$LightlyActiveMinutes, col='steelblue', main='Normal')
+hist(activity_cleaned$SedentaryMinutes, col='steelblue', main='Normal')
+hist(combine_hour_calory_cleaned$Calories, col='steelblue', main='Non-normal')
+```
+
+```{r}
+
+####setting the theme for visualization background
+theme_1 <- theme_bw()+
+  theme(axis.text.x = element_text(angle = 0, hjust = 1, vjust = 0.5),legend.position="none")
+theme_2 <- theme_bw()+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),legend.position="none")
+```
+
+
+
+
+
+```{r}
+
+#correlation plots
+par(mfrow=c(1,1))
+
+library(corrplot)
+library(RColorBrewer)
+M <-cor(daily_activity[,6:15])
+corrplot(M, type="upper", order="hclust",
+         col=brewer.pal(n=8, name="RdYlBu"))
+corrplot(M, method = 'number')
+
+```
+
+```{r}
+
+attach(daily_activity)
+#Histograms
+
+ggplot(data=daily_activity, aes(Calories))+geom_histogram(bins=40,color="blue",fill="brown") +
+  ggtitle(paste('Histogram for the distribution of calories')) +geom_vline(xintercept = mean(Calories),        # Add line for mean
+                                                                           col = "black",
+                                                                           lwd = 1) +
+  annotate("text",                        # Add text for mean
+           x = mean(Calories) * 1,
+           y = mean(Calories) * 1,
+           label = paste("Mean =", round(mean(Calories),2)),
+           col = "black",
+           size = 6)+ theme_1
+```
+
+```{r}
+
+
+### Very active minutes
+ggplot(data=daily_activity, aes(VeryActiveMinutes))+geom_histogram(bins=40,color="blue",fill="brown") +
+  ggtitle(paste('Histogram for the distribution of VeryActiveMinutes')) +geom_vline(xintercept = mean(VeryActiveMinutes),        # Add line for mean
+                                                                                    col = "black",
+                                                                                    lwd = 1) +
+  annotate("text",                        # Add text for mean
+           x = mean(VeryActiveMinutes) * 1,
+           y = mean(VeryActiveMinutes) * 1,
+           label = paste("Mean =", round(mean(VeryActiveMinutes),2)),
+           col = "black",
+           size = 6)+ theme_1
+
+```
+
+```{r}
+
+### sedentary minutes
+ggplot(data=daily_activity, aes(SedentaryMinutes))+geom_histogram(bins=40,color="blue",fill="violet") +
+  ggtitle(paste('Histogram for the distribution of SedentaryMinutes')) +geom_vline(xintercept = mean(SedentaryMinutes),        # Add line for mean
+                                                                                   col = "black",
+                                                                                   lwd = 1) +
+  annotate("text",                        # Add text for mean
+           x = mean(SedentaryMinutes) * 1,
+           y = mean(SedentaryMinutes) * 1,
+           label = paste("Mean =", round(mean(SedentaryMinutes),2)),
+           col = "black",
+           size = 6)+ theme_1
+
+```
+
+
+```{r}
+
+
+# step 3. Data preparation
+
+#  daily_activity  analysis
+# Adjust the date into a united date format
+daily_activity_1=daily_activity %>% 
+  mutate(date=as.Date(ActivityDate,format = "%m/%d/%Y")) %>% 
+  select(-ActivityDate)
+
+#Dropping the  "distance" variable, since the "minutes" (time period) and "steps" are more representative of activities duration.
+# 
+activity_cleaned=daily_activity_1 %>% 
+  select(-TotalDistance,-TrackerDistance,-LoggedActivitiesDistance,-VeryActiveDistance,-ModeratelyActiveDistance,-LightActiveDistance,-SedentaryActiveDistance) %>% 
+  mutate(in_weekday=weekdays(date,abbreviate = TRUE)) %>% 
+  select("Id","date","in_weekday",everything())
+```
+
+
+
+```{r}
+
+# daily_sleep
+#  Adjust the date into a united date format
+daily_sleep_1=daily_sleep %>% 
+  mutate(date=as.Date(SleepDay,format = "%m/%d/%Y")) %>% 
+  select(-SleepDay)
+# Drop the "TotalSleepRecord" column. (As it we only consider the bed and sleep time, number of sleep may not be significant)
+daily_sleep_2=daily_sleep_1 %>% 
+  select(-TotalSleepRecords) %>% 
+  select("Id","date",everything())
+# Check if there are any TotalMinutesAsleep>TotalTimeInBed, to ensure that it is reasonable. There should be no item found.
+#View(daily_sleep_2 %>% 
+       #filter(TotalMinutesAsleep>TotalTimeInBed))
+
+
+
+# Add the weekday column
+sleep_cleaned=daily_sleep_2 %>% 
+  mutate(in_weekday=weekdays(date,abbreviate=TRUE)) %>% 
+  select("Id","date","in_weekday",everything())
+
+```
+
+
+
+
+
+```{r}
+
+
+
+# Combining  hour_calorie and hour_steps  
+# Adjust the activity hour a united datetime format in Hour_Calorie and Hour_Step files
+hour_calory_cleaned=hour_calory %>% 
+  mutate(datetime=mdy_hms(ActivityHour)) %>% 
+  select(-ActivityHour)
+
+hour_step_cleaned=hour_step %>% 
+  mutate(datetime=mdy_hms(ActivityHour)) %>% 
+  select(-ActivityHour)
+
+# Making a data frame by combining Hour_Calorie and Hour_Step with an inner-join with "Id" and "datetime" columns
+combine_hour_calory_hour=inner_join(hour_calory_cleaned,hour_step_cleaned,c("Id","datetime"))
+# Add in_date,in_weekday,in_hour identification to each data row
+combine_hour_calory_cleaned=combine_hour_calory_hour %>% 
+  mutate(in_date=date(datetime)) %>% 
+  mutate(in_weekday=weekdays(datetime,abbreviate = TRUE)) %>% 
+  mutate(in_hour=substr(datetime,12,13)) %>% 
+  select(Id,in_date,in_weekday,in_hour,everything(),-datetime)
+```
+
+
+
+
+```{r}
+
+
+# step 4. Final Cleaned Data Frame:
+head(activity_cleaned)
+head(sleep_cleaned)
+head(combine_hour_calory_cleaned)
+```
+```{r}
+summary(activity_cleaned$Calories)
+
+```
+```{r}
+sd(activity_cleaned$Calories)
+
+```
+
+```{r}
+
+summary(activity_cleaned$VeryActiveMinutes)
+
+
+```
+
+```{r}
+
+sd(activity_cleaned$VeryActiveMinutes)
+```
+
+```{r}
+
+
+Calories <- c(rnorm(940, mean = 2304, sd = 718.1669))
+VeryActiveMinutes <- c(rnorm(940, mean = 21.16, sd = 32.8448))
+
+t.test(Calories,VeryActiveMinutes , paired = TRUE)
+
+```
+
+```{r}
+# Breakdown Activity Minutes VS Calories
+c_1=ggplot(activity_cleaned,aes(x=VeryActiveMinutes,y=Calories))+geom_point()+labs(title="Very Active Minute vs Calories")+
+  geom_smooth(colour="Blue",formula="y~x",method="lm")
+c_2=ggplot(activity_cleaned,aes(x=FairlyActiveMinutes,y=Calories))+geom_point()+labs(title="Fairly Active Minute vs Calories")+
+  geom_smooth(colour="Blue",formula="y~x",method="lm")
+c_3=ggplot(activity_cleaned,aes(x=LightlyActiveMinutes,y=Calories))+geom_point()+labs(title="Light Active Minute vs Calories")+
+  geom_smooth(colour="Blue",formula="y~x",method="lm")
+c_4=ggplot(activity_cleaned,aes(x=SedentaryMinutes,y=Calories))+geom_point()+labs(title="Sedentary Active Minute vs Calories")+
+  geom_smooth(colour="Blue",formula="y~x",method="lm")
+grid.arrange(c_4,c_3,c_2,c_1)
+
+```
+
+```{r}
+
+# Multiple Linear Regression
+
+act_cal_1=lm(Calories~VeryActiveMinutes+FairlyActiveMinutes+LightlyActiveMinutes+SedentaryMinutes,data=activity_cleaned)
+summary(act_cal_1)
+```
+
+```{r}
+
+####Box plot of calories vs days
+box_plot <- function(x) {
+  p <- ggplot(combine_hour_calory_cleaned, aes_string("in_weekday",x,fill="in_weekday")) +
+    geom_boxplot() +
+    ggtitle(paste('Boxplot of in_weekday by',x))  
+  print(p)
+}
+
+box_plot("Calories")
+box_plot("StepTotal")
+
+```
+
+```{r}
+
+#  Analyzing the activity variable
+# Steps VS Calories
+step_cal_1=lm(Calories~TotalSteps+in_weekday,data=activity_cleaned)
+summary(step_cal_1)
+```
+
+```{r}
+
+#checking for normality of the calorie residuals
+par(mfrow=c(2,2))
+plot(step_cal_1)
+```
+
+
+```{r}
+
+ggplot(activity_cleaned)+geom_point(aes(x=TotalSteps,y=Calories))+
+  geom_smooth(aes(x=TotalSteps,y=Calories),colour="Blue",formula="y~x",method="lm")+
+  labs(title="Scatterplot of calories against steps walked ")+
+  annotate("text",x=20000,y=500,label="Calories=1710 + 0.0844*Total Steps")
+```
+
+```{r}
+
+# Minutes VS Calories
+activity_cleaned_1=activity_cleaned %>% 
+  mutate(Total_minute=VeryActiveMinutes+FairlyActiveMinutes+LightlyActiveMinutes+SedentaryMinutes)
+ggplot(activity_cleaned_1)+geom_point(aes(x=Total_minute,y=Calories)) +labs(title="Scatterplot of calories against total in minutes time walked ")
+
+
+
+####Carrying out anova
+
+anova_2=aov(Calories~VeryActiveMinutes+FairlyActiveMinutes+LightlyActiveMinutes+SedentaryMinutes,data=activity_cleaned)
+summary(anova_2)
+```
+
+
+```{r}
+#####Correlation matrix for level of activity
+library(corrplot)
+library(RColorBrewer)
+par(mfrow=c(1,1))
+M1 <-cor(activity_cleaned[,4:9])
+corrplot(M1, type="upper", order="hclust",
+         col=brewer.pal(n=8, name="RdYlBu"))
+corrplot(M1, method = 'number')
+```
+
+```{r}
+
+# Pattern of each type activity
+week_order=c("Mon","Tue","Wed","Thu","Fri","Sat","Sun")  
+week_step=ggplot(activity_cleaned_1)+
+  geom_line(aes(x=factor(in_weekday,levels=week_order),y=TotalSteps),stat="summary", fun=mean,group=FALSE,colour="Dark Red")+
+  labs(title="Average steps in each day",x="Day")
+week_min=ggplot(activity_cleaned_1)+
+  geom_line(aes(x=factor(in_weekday,levels=week_order),y=Total_minute),stat="summary", fun=mean,group=FALSE,colour="Dark Blue")+
+  #theme_classic()+
+  labs(title="Average minutes in each day",x="Day")
+grid.arrange(week_step,week_min) +theme_1
+
+
+```
+
+
+
+
+
+```{r}
+
+#Time analysis of claories and steps walked
+hour_1=ggplot(combine_hour_calory_cleaned,aes(x=in_hour,y=Calories))+
+  geom_line(stat="summary",fun="mean",colour="#e43f3e",group=FALSE)+
+  geom_point(stat="summary",fun="mean",colour="#e43e3e",group=FALSE)+
+  theme_1 +
+  labs(title=" Evolution of average calories aginst time in hours",x="Hour",y="Average Calories")+
+  theme(legend.position = "none") 
+
+hour_2=ggplot(combine_hour_calory_cleaned,aes(x=in_hour,y=StepTotal))+
+  geom_line(colour="#16537e",group=FALSE,stat="summary",fun="mean")+
+  geom_point(colour="#18537e",group=FALSE,stat="summary",fun="mean")+
+  theme_1 +
+  labs(title="Distribution of average steps over the course of the day",x="Hour",y="Average Steps")+
+  theme(legend.position = "none")
+
+grid.arrange(hour_2, hour_1, ncol=1, nrow =2)
+
+
+```
+
+
+```{r}
+
+
+
+# Pattern of hourly calories expended
+hour_1=ggplot(combine_hour_calory_cleaned,aes(x=in_hour,y=Calories))+
+  geom_line(stat="summary",fun="mean",colour="#e43e3e",group=FALSE)+
+  geom_point(stat="summary",fun="mean",colour="#e43e3e",group=FALSE)+
+  theme_classic()+
+  labs(title="Distribution of average calories by hour",x="Hour",y="Average Calories")+
+  theme(legend.position = "none") 
+
+# Relationship of Bed Minute and Sleep Minute
+bed_sleep_mod=lm(TotalMinutesAsleep~TotalTimeInBed,sleep_cleaned)
+summary(bed_sleep_mod)
+
+ggplot(sleep_cleaned)+
+  theme_classic()+
+  geom_point(aes(x=TotalTimeInBed,y=TotalMinutesAsleep))+
+  geom_smooth(aes(x=TotalTimeInBed,y=TotalMinutesAsleep),method="lm",se=0,formula='y ~ x')+
+  annotate("text",x=400,y=800,label="Sleep Minute=22.12+0.86635*Bed Minute",size=4)+
+  labs(title="Relationship of Bed Minute and Sleep Minute",x="Minute in bed",y="Minute in asleep")
+```
+
+
+
+
+
